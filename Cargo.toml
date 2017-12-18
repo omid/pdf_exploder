@@ -1,0 +1,5 @@
+[package]
+
+name = "pdf_exploder"
+version = "0.0.1"
+authors = ["Omid Mottaghi Rad <omidmr@gmail.com>"]
