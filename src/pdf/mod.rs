@@ -19,22 +19,25 @@ impl<'a> Pdf<'a>  {
 
   pub fn download(&self) {}
 
-  pub fn generate_images(&self, filename: &str) {
-//  thread::spawn(|| {
+  pub fn generate_images(&self) {
+    // thread::spawn(|| {
     fs::create_dir_all("tmp").expect("Failed to create dir");
+
+    let pdf_file_splitted: Vec<&str> = self.pdf_file.split("/").collect();
+    let filename = pdf_file_splitted[pdf_file_splitted.len() - 1];
 
     Command::new("sh")
       .arg("-c")
       .arg(format!("convert {} tmp/{}.png", self.pdf_file, filename))
       .spawn()
       .expect("Cannot convert PDF to PNG");
-//  });
+    // });
   }
 
-  pub fn extract_texts(&self) {
+  pub fn extract_texts(&mut self) {
     let command = format!("pdftotext -layout {} -", self.pdf_file);
 
-//  let generate_texts = thread::spawn(move || {
+    // let generate_texts = thread::spawn(move || {
     let texts = Command::new("sh")
       .arg("-c")
       .arg(&command)
@@ -43,7 +46,7 @@ impl<'a> Pdf<'a>  {
 
     let dummy_texts = String::from_utf8_lossy(&texts.stdout);
     self.texts = dummy_texts.trim().split('\x0c').collect();
-//});
+    // });
   }
 
   pub fn send_result(&self) {}
