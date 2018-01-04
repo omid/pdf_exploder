@@ -22,5 +22,5 @@ fn main() {
   // Send requests
   pdf.send_result();
 
-  // println!("{:#?}", pdf);
+  println!("{:#?}", pdf);
 }
