@@ -14,13 +14,19 @@ fn main() {
   pdf.download();
 
   // Generate images
-  pdf.generate_images();
+  let generate_image_thread = pdf.generate_images();
 
   // Generate texts
-  pdf.extract_texts();
+  let extract_texts_thread = pdf.extract_texts();
+
+  generate_image_thread.join().expect("Oops");
+  pdf.texts = extract_texts_thread.join().unwrap();
 
   // Send requests
-  pdf.send_result();
+//  pdf.send_result();
 
-  println!("{:#?}", pdf);
+  // Cleanup
+  pdf.cleanup();
+
+//  println!("{:#?}", pdf.texts);
 }
