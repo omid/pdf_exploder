@@ -5,10 +5,11 @@ extern crate rocket;
 extern crate rocket_contrib;
 #[macro_use] extern crate serde_derive;
 
-extern crate pdf;
-
 use rocket_contrib::{Json};
-use pdf::pdf::Pdf;
+
+
+extern crate lib;
+use lib::entities::pdf::Pdf;
 
 #[derive(Serialize, Deserialize)]
 struct DownloadData {

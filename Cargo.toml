@@ -22,7 +22,7 @@ default-features = false
 features = ["json"]
 
 [lib]
-name = "pdf"
+name = "lib"
 path = "src/lib.rs"
 
 [[bin]]
