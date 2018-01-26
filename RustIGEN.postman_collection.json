@@ -21,7 +21,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n\t\"downloadData\": {\n\t\t\"type\": \"pdf\",\n\t\t\"url\": \"http://www.pdf995.com/samples/pdf.pdf\"\n\t},\n\t\"uploadData\": {\n\t\t\"url\": \"none\",\n\t\t\"callback\": {\n\t\t\t\"url\": \"none\",\n\t\t\t\"method\": \"get\"\n\t\t}\n\t}\n}"
+					"raw": "{\n\t\"downloadData\": {\n\t\t\"type\": \"pdf\",\n\t\t\"url\": \"http://www.pdf995.com/samples/pdf.pdf\"\n\t},\n\t\"uploadData\": {\n\t\t\"url\": \"none\",\n\t\t\"callback\": {\n\t\t\t\"url\": \"none\",\n\t\t\t\"method\": \"get\"\n\t\t}\n\t},\n\t\"conversionParams\": {\n\t\t\"preserveTransparency\": true\n\t}\n}"
 				},
 				"description": ""
 			},
