@@ -1,0 +1,31 @@
+{
+	"variables": [],
+	"info": {
+		"name": "RustIGEN",
+		"_postman_id": "1a022d4b-d9b0-dbdb-8c48-2308fafa5b9e",
+		"description": "",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Convert Images/Texts",
+			"request": {
+				"url": "localhost:8000/convert",
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"description": ""
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"downloadData\": {\n\t\t\"type\": \"pdf\",\n\t\t\"url\": \"http://www.pdf995.com/samples/pdf.pdf\"\n\t},\n\t\"uploadData\": {\n\t\t\"url\": \"none\",\n\t\t\"callback\": {\n\t\t\t\"url\": \"none\",\n\t\t\t\"method\": \"get\"\n\t\t}\n\t}\n}"
+				},
+				"description": ""
+			},
+			"response": []
+		}
+	]
+}
