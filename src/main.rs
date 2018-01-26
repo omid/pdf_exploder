@@ -1,14 +1,52 @@
-use std::env;
+#![feature(plugin)]
+#![plugin(rocket_codegen)]
+
+extern crate rocket;
+extern crate rocket_contrib;
+#[macro_use] extern crate serde_derive;
 
 extern crate pdf;
 
+use rocket_contrib::{Json};
 use pdf::pdf::Pdf;
 
-fn main() {
-  let args: Vec<String> = env::args().collect();
-  let pdf_file: &String = &args[1];
+#[derive(Serialize, Deserialize)]
+struct DownloadData {
+  #[serde(rename="type")]
+  _type: String,
+  url: String
+}
 
-  let mut pdf = Pdf::new(pdf_file.to_owned());
+#[derive(Serialize, Deserialize)]
+struct Callback {
+  url: String,
+  method: String
+}
+
+#[derive(Serialize, Deserialize)]
+struct UploadData {
+  url: String,
+  callback: Callback
+}
+
+#[derive(Default)]
+#[derive(Serialize, Deserialize)]
+#[allow(non_snake_case)]
+struct ConversionParams {
+  preserveTransparency: bool
+}
+
+#[derive(Serialize, Deserialize)]
+#[allow(non_snake_case)]
+struct ConvertPDFData {
+  downloadData: DownloadData,
+  uploadData: UploadData,
+  #[serde(skip_deserializing,skip_serializing)] conversionParams: ConversionParams
+}
+
+#[post("/convert", format = "application/json", data = "<data>")]
+fn convert_pdf(data: Json<ConvertPDFData>) -> &'static str {
+  let mut pdf = Pdf::new(data.downloadData.url.clone());
 
   // Download PDF file
   pdf.download();
@@ -19,14 +57,22 @@ fn main() {
   // Generate texts
   let extract_texts_thread = pdf.extract_texts();
 
-  generate_image_thread.join().expect("Couldn't extract slides");
+  generate_image_thread.join().expect("Couldn't extract images");
   pdf.texts = extract_texts_thread.join().expect("Couldn't extract texts");
 
   // Send requests
-  pdf.send_slides();
+  // pdf.send_slides();
 
-  // Cleanup
-  pdf.cleanup();
+  // Cleanup #
+   pdf.cleanup();
+
+  "Successfully converted image files"
+}
+
+fn main() {
+  rocket::ignite().mount("/", routes![convert_pdf]).launch();
+
+//
 
 //  println!("{:#?}", pdf.texts);
 }
