@@ -1,7 +1,9 @@
 extern crate futures;
 extern crate hyper;
+extern crate hyper_tls;
 extern crate tokio_core;
 extern crate rand;
+extern crate hyper_multipart_rfc7578 as hyper_multipart;
 
 use std::fs::{self, create_dir_all, OpenOptions};
 use std::process::Command;
@@ -10,8 +12,10 @@ use std::thread;
 use std::io::Write;
 use self::rand::{thread_rng, Rng};
 use self::futures::{Future, Stream};
-use self::hyper::Client;
+use self::hyper::{Client, Request, Method};
+use self::hyper_tls::HttpsConnector;
 use self::tokio_core::reactor::Core;
+use self::hyper_multipart::client::multipart;
 
 #[derive(Debug)]
 pub struct Pdf {
@@ -29,7 +33,7 @@ impl Pdf {
     }
   }
 
-  pub fn download(&mut self) {
+  pub fn download(&mut self, ) {
     let uri = self.pdf_file.parse().expect("Cannot parse the URL");
 
     let mut core = Core::new().expect("Cannot create Core instance");
@@ -96,7 +100,32 @@ impl Pdf {
     })
   }
 
-  pub fn send_result(&self) {}
+  pub fn send_slides(&self, callback: String) {
+
+    let mut core = Core::new().expect("Cannot create Core instance");
+    let client: Client<_, multipart::Body> = Client::configure()
+      .connector(HttpsConnector::new(4, &core.handle()).unwrap())
+      .body::<multipart::Body>()
+      .build(&core.handle());
+
+    for i in 0..self.texts.len() {
+      let uri = callback.parse().expect("Cannot parse the URL");
+
+      let mut req = Request::new(Method::Post, uri);
+
+      let mut form = multipart::Form::default();
+
+      form.add_text("current", (i + 1).to_string());
+      form.add_text("total", self.texts.len().to_string());
+      form.add_text("slideText", self.texts[i].clone());
+      form.add_file("file", format!("tmp/{}/slide-{}.png", self.pdf_tmp_file, i)).expect("Cannot find file");
+      form.set_body(&mut req);
+
+      core.run(client.request(req)).expect("Oops");
+    }
+
+    println!("After upload");
+  }
 
   pub fn cleanup(&self) {
     let filename = format!("tmp/{}", self.pdf_tmp_file);
