@@ -29,11 +29,10 @@ struct UploadData {
   callback: Callback
 }
 
-#[derive(Default)]
 #[derive(Serialize, Deserialize)]
 #[allow(non_snake_case)]
 struct ConversionParams {
-  preserveTransparency: bool
+  preserveTransparency: Option<bool>
 }
 
 #[derive(Serialize, Deserialize)]
@@ -41,7 +40,7 @@ struct ConversionParams {
 struct ConvertPDFData {
   downloadData: DownloadData,
   uploadData: UploadData,
-  #[serde(skip_deserializing,skip_serializing)] conversionParams: ConversionParams
+  conversionParams: Option<ConversionParams>
 }
 
 #[post("/convert", format = "application/json", data = "<data>")]
@@ -52,7 +51,10 @@ fn convert_pdf(data: Json<ConvertPDFData>) -> &'static str {
   pdf.download();
 
   // Generate images
-  let generate_image_thread = pdf.generate_images();
+  let conversion_params = data.conversionParams.as_ref().unwrap_or(&ConversionParams { preserveTransparency: Option::Some(false) });
+  let preserve_transparency = conversion_params.preserveTransparency.unwrap_or(false);
+
+  let generate_image_thread = pdf.generate_images(preserve_transparency);
 
   // Generate texts
   let extract_texts_thread = pdf.extract_texts();

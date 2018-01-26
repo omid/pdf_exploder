@@ -57,10 +57,16 @@ impl Pdf {
     println!("After download");
   }
 
-  pub fn generate_images(&self) -> thread::JoinHandle<()> {
+  pub fn generate_images(&self, transparent: bool) -> thread::JoinHandle<()> {
     let filename = format!("tmp/{}/pdf", self.pdf_tmp_file);
 
-    let command = format!("convert {} tmp/{}/slide.png", filename, self.pdf_tmp_file);
+    let mut alpha = "remove";
+
+    if transparent {
+      alpha = "on";
+    }
+
+    let command = format!("convert {} -alpha {} tmp/{}/slide.png", filename, alpha, self.pdf_tmp_file);
 
     thread::spawn(move || {
       Command::new("sh")
