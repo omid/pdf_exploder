@@ -1,8 +1,8 @@
 use std::env;
 
-extern crate pdf_exploder;
+extern crate pdf;
 
-use pdf_exploder::pdf::Pdf;
+use pdf::pdf::Pdf;
 
 fn main() {
   let args: Vec<String> = env::args().collect();
@@ -19,11 +19,11 @@ fn main() {
   // Generate texts
   let extract_texts_thread = pdf.extract_texts();
 
-  generate_image_thread.join().expect("Oops");
-  pdf.texts = extract_texts_thread.join().unwrap();
+  generate_image_thread.join().expect("Couldn't extract slides");
+  pdf.texts = extract_texts_thread.join().expect("Couldn't extract texts");
 
   // Send requests
-//  pdf.send_result();
+  pdf.send_slides();
 
   // Cleanup
   pdf.cleanup();
