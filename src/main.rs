@@ -63,7 +63,11 @@ fn convert_pdf(data: Json<ConvertPDFData>) -> &'static str {
   pdf.texts = extract_texts_thread.join().expect("Couldn't extract texts");
 
   // Send requests
-  pdf.send_slides(data.uploadData.url.clone());
+  let upload_slide_requests = pdf.send_slides(data.uploadData.url.clone());
+
+  // @TODO when all requests are finished, send another request
+  // upload_slide_requests.join().expect("Couldn't upload all slides");
+  // pdf.send_ack(data.uploadData.callback.url.clone());
 
   // Cleanup #
   pdf.cleanup();
@@ -73,6 +77,4 @@ fn convert_pdf(data: Json<ConvertPDFData>) -> &'static str {
 
 fn main() {
   rocket::ignite().mount("/", routes![convert_pdf]).launch();
-
-//  println!("{:#?}", pdf.texts);
 }

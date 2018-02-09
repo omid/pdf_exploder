@@ -101,7 +101,6 @@ impl Pdf {
   }
 
   pub fn send_slides(&self, callback: String) {
-
     let mut core = Core::new().expect("Cannot create Core instance");
     let client: Client<_, multipart::Body> = Client::configure()
       .connector(HttpsConnector::new(4, &core.handle()).unwrap())
@@ -121,10 +120,37 @@ impl Pdf {
       form.add_file("file", format!("tmp/{}/slide-{}.png", self.pdf_tmp_file, i)).expect("Cannot find file");
       form.set_body(&mut req);
 
+      // @TODO make ask async
       core.run(client.request(req)).expect("Oops");
+      println!("After upload slide");
     }
 
     println!("After upload");
+  }
+
+  pub fn send_ack(&self, callback: String) {
+    let mut core = Core::new().expect("Cannot create Core instance");
+    let client: Client<_, multipart::Body> = Client::configure()
+      .connector(HttpsConnector::new(4, &core.handle()).unwrap())
+      .body::<multipart::Body>()
+      .build(&core.handle());
+
+    let uri = callback.parse().expect("Cannot parse the URL");
+
+    let mut req = Request::new(Method::Get, uri);
+
+    // @TODO build request
+    // {
+    //   'success': state,
+    //   'message': message
+    // }
+    // 'headers': {
+    //   'Content-Type': 'application/json'
+    // }
+
+    core.run(client.request(req)).expect("Oops");
+
+    println!("After ack");
   }
 
   pub fn cleanup(&self) {
