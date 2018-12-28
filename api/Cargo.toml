@@ -1,0 +1,18 @@
+[package]
+name = "pextractor"
+version = "0.0.2"
+authors = [
+    "Omid Mottaghi Rad <omidmr@gmail.com>",
+    "Leon Marzahn <leon.marzahn@movingimage.com",
+]
+
+[dependencies]
+rocket = "0.4.0"
+serde = "1.0"
+serde_derive = "1.0"
+presentation = { path = "../presentation" }
+
+[dependencies.rocket_contrib]
+version = "*"
+default-features = false
+features = ["json"]

@@ -1,0 +1,12 @@
+[package]
+name = "presentation"
+version = "0.0.2"
+authors = [
+    "Omid Mottaghi Rad <omidmr@gmail.com>",
+    "Leon Marzahn <leon.marzahn@movingimage.com",
+]
+
+[dependencies]
+reqwest = "0.9.5"
+uuid = { version = "0.7", features = ["v4"] }
+threadpool = "1.7.1"
