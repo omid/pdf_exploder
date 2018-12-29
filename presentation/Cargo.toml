@@ -10,3 +10,10 @@ authors = [
 reqwest = "0.9.5"
 uuid = { version = "0.7", features = ["v4"] }
 threadpool = "1.7.1"
+serde = "1.0"
+serde_derive = "1.0"
+
+[dependencies.rocket_contrib]
+version = "*"
+default-features = false
+features = ["json"]

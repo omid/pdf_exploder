@@ -1,6 +1,8 @@
 extern crate uuid;
 extern crate reqwest;
 extern crate threadpool;
+extern crate rocket_contrib;
+#[macro_use] extern crate serde_derive;
 
 use std::fs::{create_dir_all, remove_dir_all, File};
 use std::process::Command;
@@ -11,6 +13,38 @@ use std::sync::mpsc::channel;
 use threadpool::ThreadPool;
 use uuid::Uuid;
 use reqwest::{Client, multipart};
+
+#[derive(Deserialize)]
+pub struct DownloadData {
+    #[serde(rename = "type")]
+    pub _type: String,
+    pub url: String,
+}
+
+#[derive(Deserialize)]
+pub struct Callback {
+    pub url: String,
+}
+
+#[derive(Deserialize)]
+pub struct UploadData {
+    pub url: String,
+    pub callback: Callback,
+}
+
+#[derive(Deserialize)]
+#[allow(non_snake_case)]
+pub struct ConversionParams {
+    pub preserveTransparency: Option<bool>,
+}
+
+#[derive(Deserialize)]
+#[allow(non_snake_case)]
+pub struct RequestBody {
+    pub downloadData: DownloadData,
+    pub uploadData: UploadData,
+    pub conversionParams: Option<ConversionParams>,
+}
 
 #[derive(Debug)]
 pub struct Presentation {
@@ -28,6 +62,37 @@ impl Presentation {
             texts: vec![],
             number_of_pages: 0,
         }
+    }
+
+    pub fn extract(&mut self, data: RequestBody) -> String {
+        let mut presentation = Presentation::new(data.downloadData.url.clone());
+
+        // Download Presentation file
+        presentation.download();
+        presentation.extract_pages();
+
+        // Generate images
+        let conversion_params = data.conversionParams.as_ref().unwrap_or(&ConversionParams {
+            preserveTransparency: Option::Some(false),
+        });
+        let preserve_transparency = conversion_params.preserveTransparency.unwrap_or(false);
+
+        let generate_image_thread = presentation.generate_images(preserve_transparency);
+        let extract_texts_thread = presentation.extract_texts();
+
+        generate_image_thread.join();
+        extract_texts_thread.join();
+
+        // Send requests
+        let upload_slide_requests = presentation.send_slides(data.uploadData.url.clone());
+        upload_slide_requests.join();
+
+        presentation.send_ack("success", "message", data.uploadData.callback.url.clone());
+
+        // Cleanup
+        presentation.cleanup();
+
+        format!("Successfully extracted {} slides", presentation.number_of_pages)
     }
 
     pub fn download(&mut self) {
