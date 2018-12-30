@@ -1,0 +1,20 @@
+[package]
+name = "lambda"
+version = "0.0.2"
+authors = [
+    "Omid Mottaghi Rad <omidmr@gmail.com>"
+]
+edition = "2018"
+
+[dependencies]
+lambda_runtime = "0.1"
+serde = "^1"
+serde_json = "^1"
+serde_derive = "^1"
+log = "^0.4"
+simple_logger = "^1"
+presentation = { path = "../presentation" }
+
+[[bin]]
+name = "bootstrap"
+path = "src/main.rs"
