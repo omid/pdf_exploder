@@ -1,7 +1,6 @@
 extern crate uuid;
 extern crate reqwest;
 extern crate threadpool;
-extern crate rocket_contrib;
 #[macro_use] extern crate serde_derive;
 
 use std::fs::{create_dir_all, remove_dir_all, File};
@@ -14,31 +13,31 @@ use threadpool::ThreadPool;
 use uuid::Uuid;
 use reqwest::{Client, multipart};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct DownloadData {
     #[serde(rename = "type")]
     pub _type: String,
     pub url: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct Callback {
     pub url: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct UploadData {
     pub url: String,
     pub callback: Callback,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[allow(non_snake_case)]
 pub struct ConversionParams {
     pub preserveTransparency: Option<bool>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[allow(non_snake_case)]
 pub struct RequestBody {
     pub downloadData: DownloadData,
@@ -46,7 +45,7 @@ pub struct RequestBody {
     pub conversionParams: Option<ConversionParams>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Presentation {
     pub presentation_file: String,
     pub presentation_tmp_file: String,
