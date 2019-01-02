@@ -6,7 +6,6 @@ extern crate threadpool;
 use std::fs::{rename, create_dir_all, remove_dir_all, File};
 use std::process::Command;
 use std::collections::HashMap;
-use std::io::Write;
 use std::sync::mpsc::channel;
 
 use threadpool::ThreadPool;
@@ -54,21 +53,18 @@ pub struct Presentation {
 }
 
 impl Presentation {
-    pub fn new(presentation_file: String) -> Presentation {
-        Presentation {
-            presentation_file,
+    pub fn extract(data: RequestBody) -> String {
+        let mut presentation = Presentation {
+            presentation_file: data.downloadData.url.clone(),
             presentation_tmp_file: String::new(),
             texts: vec![],
             number_of_pages: 0,
-        }
-    }
-
-    pub fn extract(&mut self, data: RequestBody) -> String {
-        let mut presentation = Presentation::new(data.downloadData.url.clone());
+        };
 
         // Download Presentation file
         presentation.download();
         presentation.convert_to_pdf(data.downloadData._type);
+        presentation.extract_number_of_pages();
         presentation.extract_pages();
 
         // Generate images
@@ -83,9 +79,17 @@ impl Presentation {
         generate_image_thread.join();
         extract_texts_thread.join();
 
+        if generate_image_thread.panic_count() > 0 || extract_texts_thread.panic_count() > 0 {
+            return presentation.error_happened(data.uploadData.callback.url.clone());
+        }
+
         // Send requests
         let upload_slide_requests = presentation.send_slides(data.uploadData.url.clone());
         upload_slide_requests.join();
+
+        if upload_slide_requests.panic_count() > 0 {
+            return presentation.error_happened(data.uploadData.callback.url.clone());
+        }
 
         presentation.send_ack("success", "message", data.uploadData.callback.url.clone());
 
@@ -95,35 +99,59 @@ impl Presentation {
         format!("Successfully extracted {} slides", presentation.number_of_pages)
     }
 
-    pub fn download(&mut self) {
+    fn error_happened(&self, callback_url: String) -> String {
+        self.send_ack("error", "message", callback_url);
+
+        // Cleanup
+        self.cleanup();
+
+        format!("Error happened in the extraction")
+    }
+
+    fn download(&mut self) {
         self.presentation_tmp_file = Uuid::new_v4().to_string();
 
         create_dir_all(format!("tmp/{}", self.presentation_tmp_file)).expect("Failed to create dir");
 
         let client = Client::new();
-        let response = client.get(&self.presentation_file).send();
+        let mut response = client.get(&self.presentation_file).send().unwrap();
 
         let mut buffer = File::create(format!("tmp/{}/presentation", self.presentation_tmp_file)).unwrap();
-        let text = response.unwrap().text().unwrap();
-        buffer.write(text.as_bytes()).expect("Cannot download the file");
-
-        self.extract_number_of_pages();
-
-        // pre-fill texts vector
-        self.texts = vec!["".to_string(); self.number_of_pages];
+        response.copy_to(&mut buffer).unwrap();
 
         println!("After download");
     }
 
-    fn extract_number_of_pages(&mut self) {
+    fn convert_to_pdf(&self, _type: String) {
+        let supported_formats = ["ppt", "pptx", "odp"];
+
         let filename = format!("tmp/{}/presentation", self.presentation_tmp_file);
+        let pdf_filename = format!("tmp/{}/pdf.pdf", self.presentation_tmp_file);
+
+        if supported_formats.contains(&_type.as_str()) {
+            let command = format!(
+                "unoconv -f pdf -o \"{}\" \"{}\"",
+                pdf_filename,
+                filename,
+            );
+
+            Command::new("sh").arg("-c").arg(&command).output().expect(
+                "Could not extract presentation pages of presentation",
+            );
+        } else if _type == "pdf" {
+            rename(&filename, &pdf_filename).unwrap();
+        }
+
+        println!("After conversion to PDF");
+    }
+
+    fn extract_number_of_pages(&mut self) {
+        let filename = format!("tmp/{}/pdf.pdf", self.presentation_tmp_file);
 
         let command = format!(
             "pdfinfo {} | grep --binary-files=text Pages | cut -f 2 -d \":\"",
             filename,
         );
-
-        println!("{}", command);
 
         let out = Command::new("sh").arg("-c").arg(&command).output().expect(
             "Could not extract presentation pages of presentation",
@@ -134,33 +162,13 @@ impl Presentation {
         let output = String::from_utf8_lossy(&out.stdout);
 
         self.number_of_pages = output.trim().parse::<usize>().unwrap();
+
+        // pre-fill texts vector
+        self.texts = vec!["".to_string(); self.number_of_pages];
     }
 
-    pub fn convert_to_pdf(&mut self, _type: String) {
-        let supported_formats = ["ppt", "pptx", "odp"];
-
-        let filename = format!("tmp/{}/presentation", self.presentation_tmp_file);
-        let pdf_filename = format!("tmp/{}/pdf", self.presentation_tmp_file);
-
-        if supported_formats.contains(&_type.as_str()) {
-            rename(&filename, format!("{}.pdf", &filename)).unwrap();
-        } else if _type == "pdf" {
-            let command = format!(
-                "unoconv -f pdf -o \"{}\" \"{}\"",
-                pdf_filename,
-                filename,
-            );
-
-            Command::new("sh").arg("-c").arg(&command).output().expect(
-                "Could not extract presentation pages of presentation",
-            );
-        }
-
-        println!("After conversion to PDF");
-    }
-
-    pub fn extract_pages(&self) {
-        let filename = format!("tmp/{}/pdf", self.presentation_tmp_file);
+    fn extract_pages(&self) {
+        let filename = format!("tmp/{}/pdf.pdf", self.presentation_tmp_file);
 
         let command = format!(
             "pdfseparate {} tmp/{}/%d.pdf",
@@ -175,7 +183,7 @@ impl Presentation {
         println!("After convert");
     }
 
-    pub fn generate_images(&self, transparent: bool) -> ThreadPool {
+    fn generate_images(&self, transparent: bool) -> ThreadPool {
         let mut alpha = "";
 
         if transparent {
@@ -206,7 +214,7 @@ impl Presentation {
         pool
     }
 
-    pub fn extract_texts(&mut self) -> ThreadPool {
+    fn extract_texts(& mut self) -> ThreadPool {
         let pool = ThreadPool::new(10);
         let (tx, rx) = channel();
 
@@ -238,11 +246,12 @@ impl Presentation {
         pool
     }
 
-    pub fn send_slides(&self, callback: String) -> ThreadPool {
+    fn send_slides(&self, callback: String) -> ThreadPool {
         let pool = ThreadPool::new(10);
 
-        println!("callback: {}", callback);
         for i in 0..(self.number_of_pages) {
+            println!("callback: {} for tmp/{}/{}.png", callback, self.presentation_tmp_file, i+1);
+
             let form = multipart::Form::new()
                 .text("current", (i + 1).to_string())
                 .text("total", self.number_of_pages.to_string())
@@ -254,13 +263,16 @@ impl Presentation {
             let client = Client::new();
 
             pool.execute(move|| {
-                client.post(&dummy_cl)
+                let out = client.post(&dummy_cl)
                     .multipart(form)
                     .send()
+                    .unwrap()
+                    .text()
                     .unwrap();
-            });
 
-            println!("After upload slide");
+                println!("Callback response for {} at {} is {}", i+1, dummy_cl, &out);
+                println!("After upload slide {}", i+1);
+            });
         }
 
         println!("After upload");
@@ -268,7 +280,7 @@ impl Presentation {
         pool
     }
 
-    pub fn send_ack(&self, state: &str, message: &str, callback: String) {
+    fn send_ack(&self, state: &str, message: &str, callback: String) {
         let client = Client::new();
 
         let mut body = HashMap::new();
@@ -283,7 +295,7 @@ impl Presentation {
         println!("After ack");
     }
 
-    pub fn cleanup(&self) {
+    fn cleanup(&self) {
         let filename = format!("tmp/{}", self.presentation_tmp_file);
         remove_dir_all(filename).expect("Couldn't cleanup");
         println!("After delete");
