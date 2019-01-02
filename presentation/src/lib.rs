@@ -3,7 +3,7 @@ extern crate reqwest;
 extern crate threadpool;
 #[macro_use] extern crate serde_derive;
 
-use std::fs::{create_dir_all, remove_dir_all, File};
+use std::fs::{rename, create_dir_all, remove_dir_all, File};
 use std::process::Command;
 use std::collections::HashMap;
 use std::io::Write;
@@ -68,6 +68,7 @@ impl Presentation {
 
         // Download Presentation file
         presentation.download();
+        presentation.convert_to_pdf(data.downloadData._type);
         presentation.extract_pages();
 
         // Generate images
@@ -135,8 +136,31 @@ impl Presentation {
         self.number_of_pages = output.trim().parse::<usize>().unwrap();
     }
 
-    pub fn extract_pages(&self) {
+    pub fn convert_to_pdf(&mut self, _type: String) {
+        let supported_formats = ["ppt", "pptx", "odp"];
+
         let filename = format!("tmp/{}/presentation", self.presentation_tmp_file);
+        let pdf_filename = format!("tmp/{}/pdf", self.presentation_tmp_file);
+
+        if supported_formats.contains(&_type.as_str()) {
+            rename(&filename, format!("{}.pdf", &filename)).unwrap();
+        } else if _type == "pdf" {
+            let command = format!(
+                "unoconv -f pdf -o \"{}\" \"{}\"",
+                pdf_filename,
+                filename,
+            );
+
+            Command::new("sh").arg("-c").arg(&command).output().expect(
+                "Could not extract presentation pages of presentation",
+            );
+        }
+
+        println!("After conversion to PDF");
+    }
+
+    pub fn extract_pages(&self) {
+        let filename = format!("tmp/{}/pdf", self.presentation_tmp_file);
 
         let command = format!(
             "pdfseparate {} tmp/{}/%d.pdf",
