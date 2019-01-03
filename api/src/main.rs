@@ -11,9 +11,7 @@ use rocket_contrib::json::Json;
 
 #[post("/convert", format = "application/json", data = "<request_body>")]
 fn convert_presentation(request_body: Json<RequestBody>) -> String {
-    let mut presentation = Presentation::new(request_body.downloadData.url.clone());
-
-    presentation.extract(request_body.into_inner())
+    Presentation::extract(request_body.into_inner())
 }
 
 fn main() {

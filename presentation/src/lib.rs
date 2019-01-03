@@ -1,12 +1,12 @@
 extern crate uuid;
 extern crate reqwest;
 extern crate threadpool;
+#[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
 
-use std::fs::{create_dir_all, remove_dir_all, File};
+use std::fs::{rename, create_dir_all, remove_dir_all, File};
 use std::process::Command;
 use std::collections::HashMap;
-use std::io::Write;
 use std::sync::mpsc::channel;
 
 use threadpool::ThreadPool;
@@ -54,20 +54,20 @@ pub struct Presentation {
 }
 
 impl Presentation {
-    pub fn new(presentation_file: String) -> Presentation {
-        Presentation {
-            presentation_file,
+    pub fn extract(data: RequestBody) -> String {
+        info!("Extraction Started");
+
+        let mut presentation = Presentation {
+            presentation_file: data.downloadData.url.clone(),
             presentation_tmp_file: String::new(),
             texts: vec![],
             number_of_pages: 0,
-        }
-    }
-
-    pub fn extract(&mut self, data: RequestBody) -> String {
-        let mut presentation = Presentation::new(data.downloadData.url.clone());
+        };
 
         // Download Presentation file
         presentation.download();
+        presentation.convert_to_pdf(data.downloadData._type);
+        presentation.extract_number_of_pages();
         presentation.extract_pages();
 
         // Generate images
@@ -82,61 +82,125 @@ impl Presentation {
         generate_image_thread.join();
         extract_texts_thread.join();
 
+        if generate_image_thread.panic_count() > 0 || extract_texts_thread.panic_count() > 0 {
+            return presentation.error_happened(data.uploadData.callback.url.clone());
+        }
+
         // Send requests
         let upload_slide_requests = presentation.send_slides(data.uploadData.url.clone());
         upload_slide_requests.join();
+
+        if upload_slide_requests.panic_count() > 0 {
+            return presentation.error_happened(data.uploadData.callback.url.clone());
+        }
 
         presentation.send_ack("success", "message", data.uploadData.callback.url.clone());
 
         // Cleanup
         presentation.cleanup();
 
+        info!("Extraction Finished.");
+
         format!("Successfully extracted {} slides", presentation.number_of_pages)
     }
 
-    pub fn download(&mut self) {
+    fn error_happened(&self, callback_url: String) -> String {
+        error!("Error happened in the extraction");
+
+        self.send_ack("error", "message", callback_url);
+
+        // Cleanup
+        self.cleanup();
+
+        format!("Error happened in the extraction")
+    }
+
+    fn download(&mut self) {
+        info!("> Download Started");
+
         self.presentation_tmp_file = Uuid::new_v4().to_string();
 
         create_dir_all(format!("tmp/{}", self.presentation_tmp_file)).expect("Failed to create dir");
 
         let client = Client::new();
-        let response = client.get(&self.presentation_file).send();
+        let mut response = client.get(&self.presentation_file).send().unwrap();
+
+        info!(">> URL: {}", self.presentation_file);
 
         let mut buffer = File::create(format!("tmp/{}/presentation", self.presentation_tmp_file)).unwrap();
-        let text = response.unwrap().text().unwrap();
-        buffer.write(text.as_bytes()).expect("Cannot download the file");
+        response.copy_to(&mut buffer).unwrap();
 
-        self.extract_number_of_pages();
+        info!("> Download Finished.");
+    }
 
-        // pre-fill texts vector
-        self.texts = vec!["".to_string(); self.number_of_pages];
+    fn convert_to_pdf(&self, _type: String) {
+        info!("> Convert to PDF Started");
 
-        println!("After download");
+        let supported_formats = ["ppt", "pptx", "odp"];
+
+        let filename = format!("tmp/{}/presentation", self.presentation_tmp_file);
+        let pdf_filename = format!("tmp/{}/pdf.pdf", self.presentation_tmp_file);
+
+        if supported_formats.contains(&_type.as_str()) {
+            let command = format!(
+                "unoconv -f pdf -o \"{}\" \"{}\"",
+                pdf_filename,
+                filename,
+            );
+
+            info!(">> Conversion command: {}", command);
+
+            let out = Command::new("sh").arg("-c").arg(&command).output().expect(
+                "Could not extract presentation pages of presentation",
+            );
+
+            let output = String::from_utf8_lossy(&out.stdout);
+
+            info!(">> Output: {}", output);
+
+        } else if _type == "pdf" {
+            rename(&filename, &pdf_filename).unwrap();
+
+            info!(">>> Rename PDF file from {} to {}", filename, pdf_filename);
+        }
+
+        info!("> Convert to PDF Finished.");
     }
 
     fn extract_number_of_pages(&mut self) {
-        let filename = format!("tmp/{}/presentation", self.presentation_tmp_file);
+        info!("> Extract Number of Pages Started");
+
+        let filename = format!("tmp/{}/pdf.pdf", self.presentation_tmp_file);
 
         let command = format!(
             "pdfinfo {} | grep --binary-files=text Pages | cut -f 2 -d \":\"",
             filename,
         );
 
-        println!("{}", command);
+        info!(">> Extract Number of Pages command: {}", command);
 
         let out = Command::new("sh").arg("-c").arg(&command).output().expect(
             "Could not extract presentation pages of presentation",
         );
 
-        println!("After number of page command");
-
         let output = String::from_utf8_lossy(&out.stdout);
 
+        info!(">> Output: {}", output);
+
         self.number_of_pages = output.trim().parse::<usize>().unwrap();
+
+        info!(">> Number of pages: {}", self.number_of_pages);
+
+        // pre-fill texts vector
+        self.texts = vec!["".to_string(); self.number_of_pages];
+
+        info!("> Extract Number of Pages Finished");
     }
 
-    pub fn extract_pages(&self) {
-        let filename = format!("tmp/{}/presentation", self.presentation_tmp_file);
+    fn extract_pages(&self) {
+        info!("> Extract Pages Started");
+
+        let filename = format!("tmp/{}/pdf.pdf", self.presentation_tmp_file);
 
         let command = format!(
             "pdfseparate {} tmp/{}/%d.pdf",
@@ -144,14 +208,22 @@ impl Presentation {
             self.presentation_tmp_file,
         );
 
-        Command::new("sh").arg("-c").arg(&command).output().expect(
+        info!(">> Extract Pages command: {}", command);
+
+        let out = Command::new("sh").arg("-c").arg(&command).output().expect(
             "Could not extract presentation pages of presentation",
         );
 
-        println!("After convert");
+        let output = String::from_utf8_lossy(&out.stdout);
+
+        info!(">> Output: {}", output);
+
+        info!("> Extract Pages Finished.");
     }
 
-    pub fn generate_images(&self, transparent: bool) -> ThreadPool {
+    fn generate_images(&self, transparent: bool) -> ThreadPool {
+        info!("> Generate Images Started");
+
         let mut alpha = "";
 
         if transparent {
@@ -170,19 +242,25 @@ impl Presentation {
                 filename,
             );
 
+            info!(">> Generate Images: command {} for slide {}", command, i);
+
             pool.execute(move|| {
                 Command::new("sh").arg("-c").arg(&command).output().expect(
                     "Cannot convert PDF to PNG",
                 );
 
-                println!("After convert {}", i);
+                info!(">> Generate Images: slide {}", i);
             });
         };
+
+        info!("> Generate Images continued in the background...");
 
         pool
     }
 
-    pub fn extract_texts(&mut self) -> ThreadPool {
+    fn extract_texts(& mut self) -> ThreadPool {
+        info!("> Extract Texts Started");
+
         let pool = ThreadPool::new(10);
         let (tx, rx) = channel();
 
@@ -190,7 +268,7 @@ impl Presentation {
             let filename = format!("tmp/{}/{}.pdf", self.presentation_tmp_file, i);
             let command = format!("pdftotext -layout {} -", filename);
 
-            println!("{}", command);
+            info!(">> Generate Texts: command {} for slide {}", command, i);
 
             let tx = tx.clone();
             pool.execute(move|| {
@@ -199,11 +277,10 @@ impl Presentation {
                 );
 
                 let text = String::from_utf8_lossy(&out.stdout);
-                println!("After extract");
 
                 tx.send((i, text.trim().to_string())).expect("channel will be waiting");
 
-                println!("After text extract {}", i);
+                info!(">> Generate Texts: slide {}", i);
             });
         };
 
@@ -211,14 +288,19 @@ impl Presentation {
             self.texts.insert(i-1, text);
         });
 
+        info!("> Generate Texts continued in the background...");
+
         pool
     }
 
-    pub fn send_slides(&self, callback: String) -> ThreadPool {
+    fn send_slides(&self, callback: String) -> ThreadPool {
+        info!("> Send Slides Started");
+
         let pool = ThreadPool::new(10);
 
-        println!("callback: {}", callback);
         for i in 0..(self.number_of_pages) {
+            println!("callback: {} for tmp/{}/{}.png", callback, self.presentation_tmp_file, i+1);
+
             let form = multipart::Form::new()
                 .text("current", (i + 1).to_string())
                 .text("total", self.number_of_pages.to_string())
@@ -230,38 +312,50 @@ impl Presentation {
             let client = Client::new();
 
             pool.execute(move|| {
-                client.post(&dummy_cl)
+                let out = client.post(&dummy_cl)
                     .multipart(form)
                     .send()
+                    .unwrap()
+                    .text()
                     .unwrap();
-            });
 
-            println!("After upload slide");
+                info!(">> Callback response for {} at {} is {}", i+1, dummy_cl, &out);
+            });
         }
 
-        println!("After upload");
+        info!("> Send Slides continued in the background...");
 
         pool
     }
 
-    pub fn send_ack(&self, state: &str, message: &str, callback: String) {
+    fn send_ack(&self, state: &str, message: &str, callback: String) {
+        info!("> Send ACK Started");
+
         let client = Client::new();
 
         let mut body = HashMap::new();
         body.insert("success", state);
         body.insert("message", message);
 
-        client.get(&callback)
+        let out = client.get(&callback)
             .json(&body)
             .send()
+            .unwrap()
+            .text()
             .unwrap();
 
-        println!("After ack");
+        info!(">> Callback body: {:?}", body);
+        info!(">> Callback response: {}", &out);
+
+        info!("> Send ACK Finished.");
     }
 
-    pub fn cleanup(&self) {
+    fn cleanup(&self) {
+        info!("> Cleanup Started");
+
         let filename = format!("tmp/{}", self.presentation_tmp_file);
         remove_dir_all(filename).expect("Couldn't cleanup");
-        println!("After delete");
+
+        info!("> Cleanup Finished.");
     }
 }
