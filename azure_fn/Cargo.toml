@@ -1,0 +1,22 @@
+[package]
+name = "azure_fn"
+version = "0.0.2"
+authors = [
+    "Omid Mottaghi Rad <omidmr@gmail.com>"
+]
+edition = "2018"
+
+[dependencies]
+azure-functions = "0.3.0"
+log = "0.4.6"
+
+# The current setup of azure-functions, couldn't accept libraries from the parent directory
+# It's also almost impossible to COPY a _parent_ directory into the docker
+# So here we're using the git repo for the presentation library
+presentation = { git = "https://github.com/omid/pextractor", branch = "master" }
+# or # presentation = { git = "https://github.com/omid/pextractor", rev = "e735568" }
+
+# The following dep is not required by this package
+# It's just here to configure grpcio to use openssl by default
+# You may need to remove or change it later
+grpcio = {version = "0.4.1", features = ["openssl"] }
