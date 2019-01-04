@@ -1,0 +1,96 @@
+{
+	"info": {
+		"_postman_id": "73946ea7-af62-2a42-27f0-3b979dc5cf28",
+		"name": "Pextractor",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Azure Functions",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"downloadData\": {\n\t\t\"type\": \"pdf\",\n\t\t\"url\": \"https://www.iso.org/files/live/sites/isoorg/files/archive/pdf/en/annual_report_2009.pdf\"\n\t},\n\t\"uploadData\": {\n\t\t\"url\": \"https://hookb.in/9XePjxG0wJsj3NK8JE2Y\",\n\t\t\"method\": \"POST\",\n\t\t\"callback\": {\n\t\t\t\"url\": \"https://hookb.in/9XePjxG0wJsj3NK8JE2Y\",\n\t\t\t\"method\": \"GET\"\n\t\t}\n\t},\n\t\"conversionParams\": {\n\t\t\"preserveTransparency\": true\n\t}\n}"
+				},
+				"url": {
+					"raw": "https://pextractor.azurewebsites.net/api/convert",
+					"protocol": "https",
+					"host": [
+						"pextractor",
+						"azurewebsites",
+						"net"
+					],
+					"path": [
+						"api",
+						"convert"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Local Azure Functions",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"downloadData\": {\n\t\t\"type\": \"pdf\",\n\t\t\"url\": \"https://www.iso.org/files/live/sites/isoorg/files/archive/pdf/en/annual_report_2009.pdf\"\n\t},\n\t\"uploadData\": {\n\t\t\"url\": \"https://hookb.in/9XePjxG0wJsj3NK8JE2Y\",\n\t\t\"method\": \"POST\",\n\t\t\"callback\": {\n\t\t\t\"url\": \"https://hookb.in/9XePjxG0wJsj3NK8JE2Y\",\n\t\t\t\"method\": \"GET\"\n\t\t}\n\t},\n\t\"conversionParams\": {\n\t\t\"preserveTransparency\": true\n\t}\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/convert",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"convert"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Local API",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"downloadData\": {\n\t\t\"type\": \"pdf\",\n\t\t\"url\": \"https://www.iso.org/files/live/sites/isoorg/files/archive/pdf/en/annual_report_2009.pdf\"\n\t},\n\t\"uploadData\": {\n\t\t\"url\": \"https://hookb.in/3O2bjV7LwdugmeZV9KOG\",\n\t\t\"method\": \"POST\",\n\t\t\"callback\": {\n\t\t\t\"url\": \"https://hookb.in/3O2bjV7LwdugmeZV9KOG\",\n\t\t\t\"method\": \"GET\"\n\t\t}\n\t},\n\t\"conversionParams\": {\n\t\t\"preserveTransparency\": true\n\t}\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8000/convert",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"convert"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
