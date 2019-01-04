@@ -19,8 +19,14 @@ pub fn convert(request: &HttpRequest) -> HttpResponse {
 
     // checking the body
     if let Ok(request_body) = request.body().as_json::<RequestBody>() {
-        return Presentation::extract(request_body).into()
+        Presentation::extract(request_body);
+
+        return r#"{
+	        "message": "OK"
+        }"#.into()
     }
 
-    "Cannot generate slides without a proper input!".into()
+    return r#"{
+	        "message": "Cannot generate slides without a proper input!"
+        }"#.into()
 }

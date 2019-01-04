@@ -11,7 +11,11 @@ use rocket_contrib::json::Json;
 
 #[post("/convert", format = "application/json", data = "<request_body>")]
 fn convert_presentation(request_body: Json<RequestBody>) -> String {
-    Presentation::extract(request_body.into_inner())
+    Presentation::extract(request_body.into_inner());
+
+    r#"{
+	    "message": "OK"
+    }"#.into()
 }
 
 fn main() {

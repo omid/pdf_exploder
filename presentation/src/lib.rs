@@ -54,65 +54,69 @@ pub struct Presentation {
 }
 
 impl Presentation {
-    pub fn extract(data: RequestBody) -> String {
-        info!("Extraction Started");
+    pub fn extract(data: RequestBody) {
+        let pool = ThreadPool::new(1);
 
-        let mut presentation = Presentation {
-            presentation_file: data.downloadData.url.clone(),
-            presentation_tmp_file: String::new(),
-            texts: vec![],
-            number_of_pages: 0,
-        };
+        pool.execute(move|| {
+            info!("Extraction Started");
 
-        // Download Presentation file
-        presentation.download();
-        presentation.convert_to_pdf(data.downloadData._type);
-        presentation.extract_number_of_pages();
-        presentation.extract_pages();
+            let mut presentation = Presentation {
+                presentation_file: data.downloadData.url.clone(),
+                presentation_tmp_file: String::new(),
+                texts: vec![],
+                number_of_pages: 0,
+            };
 
-        // Generate images
-        let conversion_params = data.conversionParams.as_ref().unwrap_or(&ConversionParams {
-            preserveTransparency: Option::Some(false),
+            // Download Presentation file
+            presentation.download();
+            presentation.convert_to_pdf(data.downloadData._type);
+            presentation.extract_number_of_pages();
+            presentation.extract_pages();
+
+            // Generate images
+            let conversion_params = data.conversionParams.as_ref().unwrap_or(&ConversionParams {
+                preserveTransparency: Option::Some(false),
+            });
+            let preserve_transparency = conversion_params.preserveTransparency.unwrap_or(false);
+
+            let generate_image_thread = presentation.generate_images(preserve_transparency);
+            let extract_texts_thread = presentation.extract_texts();
+
+            generate_image_thread.join();
+            extract_texts_thread.join();
+
+            if generate_image_thread.panic_count() > 0 || extract_texts_thread.panic_count() > 0 {
+                presentation.error_happened(data.uploadData.callback.url.clone());
+
+                return;
+            }
+
+            // Send requests
+            let upload_slide_requests = presentation.send_slides(data.uploadData.url.clone());
+            upload_slide_requests.join();
+
+            if upload_slide_requests.panic_count() > 0 {
+                presentation.error_happened(data.uploadData.callback.url.clone());
+
+                return;
+            }
+
+            presentation.send_ack("success", "message", data.uploadData.callback.url.clone());
+
+            // Cleanup
+            presentation.cleanup();
+
+            info!("Extraction Finished.");
         });
-        let preserve_transparency = conversion_params.preserveTransparency.unwrap_or(false);
-
-        let generate_image_thread = presentation.generate_images(preserve_transparency);
-        let extract_texts_thread = presentation.extract_texts();
-
-        generate_image_thread.join();
-        extract_texts_thread.join();
-
-        if generate_image_thread.panic_count() > 0 || extract_texts_thread.panic_count() > 0 {
-            return presentation.error_happened(data.uploadData.callback.url.clone());
-        }
-
-        // Send requests
-        let upload_slide_requests = presentation.send_slides(data.uploadData.url.clone());
-        upload_slide_requests.join();
-
-        if upload_slide_requests.panic_count() > 0 {
-            return presentation.error_happened(data.uploadData.callback.url.clone());
-        }
-
-        presentation.send_ack("success", "message", data.uploadData.callback.url.clone());
-
-        // Cleanup
-        presentation.cleanup();
-
-        info!("Extraction Finished.");
-
-        format!("Successfully extracted {} slides", presentation.number_of_pages)
     }
 
-    fn error_happened(&self, callback_url: String) -> String {
+    fn error_happened(&self, callback_url: String) {
         error!("Error happened in the extraction");
 
         self.send_ack("error", "message", callback_url);
 
         // Cleanup
         self.cleanup();
-
-        format!("Error happened in the extraction")
     }
 
     fn download(&mut self) {
@@ -259,7 +263,7 @@ impl Presentation {
     }
 
     fn extract_texts(& mut self) -> ThreadPool {
-        info!("> Extract Texts Started");
+        info!("> Generate Texts Started");
 
         let pool = ThreadPool::new(10);
         let (tx, rx) = channel();
@@ -288,7 +292,7 @@ impl Presentation {
             self.texts.insert(i-1, text);
         });
 
-        info!("> Generate Texts continued in the background...");
+        info!("> Generate Texts Finished.");
 
         pool
     }
